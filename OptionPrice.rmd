@@ -10,8 +10,12 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library("fOptions")
 library("Quandl")
 Quandl.api_key('SKszNw27kx6PnaRnz_hL')
+
+startDate = '2017-06-01'
+endDate = '2018-06-01'
 ```
 
 Data from Boerse Stuttgart [https://www.quandl.com/data/SSE-Boerse-Stuttgart]
@@ -21,9 +25,6 @@ Data from Boerse Stuttgart [https://www.quandl.com/data/SSE-Boerse-Stuttgart]
 #### Historische Werte [1 Jahr]
 Tägliche Abschlusswerte
 ```{r}
-startDate = '2017-06-01'
-endDate = '2018-06-01'
-
 patDataCode = 'SSE/PAT'
 
 patLastData = Quandl(patDataCode, type='zoo', collapse="daily", start_date=startDate, end_date=endDate)[,"Last"]
@@ -40,7 +41,9 @@ plot(patLastReturn,ylab="%",xlab="Zeit",main="PATRIZIA IMMOBILIEN STOCK Rendite 
 ```{r}
 patLastSd <- sd(patLastReturn)
 patLastMean <- mean(patLastReturn)
+```
 
+```{r}
 patMatrix = matrix(c(patLastSd,patLastMean),ncol=2,byrow=FALSE)
 colnames(patMatrix) = c("Standardabweichung","Mittelwert")
 print.table(patMatrix)
@@ -54,8 +57,7 @@ nSim = 1000
 nDays = 180
 
 S = matrix(0,nrow=nDays,ncol=nSim)
-```
-```{r}
+
 for (i in 1:nSim) {
   SVec = rep(0, nDays)
   SVec[1] = S0
@@ -73,7 +75,7 @@ for (i in 1:nSim) {
 S0 = patLastData[length(patLastData)]
 
 mean = patLastMean * nDays
-sigma = patLastSd * sqrt(nDays)
+patSigma = patLastSd * sqrt(nDays)
 t = seq(from=0,to=1,length.out=nDays)
 meanBnd = vector(length = nDays) 
 upBnd = vector(length = nDays) 
@@ -85,8 +87,9 @@ for(i in 0:nDays){
   upBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i] + (sigma * 2.5 * sqrt(t[i])))
   lowBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i] + (sigma * -2.5 * sqrt(t[i])))
 }
+```
 
-
+```{r,echo=FALSE}
 #Presentation of the simulation.Green Line is the Mean of all simulations and the blue lines are the boundaries
 
 matplot(S,type='l',col=1:100,ylab='PATRIZIA IMMOBILIEN Stock $',xlab='Tage',main='GBM Simulation')
@@ -95,3 +98,23 @@ matlines(upBnd,lwd=3,col="blue")
 matlines(meanBnd,lwd=4,col="red")
 ```
 
+
+
+#### Call Put Options price Black Scholes
+--> Berechnung der Optionspreise mit dem Modell und Vergleich mit dem theoretischen Black Scholes Modell
+http://stock.tradingninja.com/how-to-price-stock-options-using-r/
+
+```{r}
+openS = head(Quandl(patDataCode, start_date=startDate, end_date=endDate), n=1)
+S = openS$Open
+strikecall = 15
+optionCall = GBSOption(TypeFlag = "c", S, strikecall, 1/12, r = 0.03, b = 0.03, patSigma)
+cat("Option Call Price",optionCall@price)
+
+strikeput = 12
+optionPut = GBSOption(TypeFlag = "p", S, strikeput, 1/12, r = 0.03, b = 0.03, patSigma)
+cat("Option Put Price",optionPut@price)
+
+
+
+```
