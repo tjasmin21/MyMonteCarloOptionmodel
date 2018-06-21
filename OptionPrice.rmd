@@ -1,0 +1,97 @@
+---
+title: "OptionPrice"
+author: "Jasmin Thevathas"
+date: "09.06.2018"
+output: 
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("Quandl")
+Quandl.api_key('SKszNw27kx6PnaRnz_hL')
+```
+
+Data from Boerse Stuttgart [https://www.quandl.com/data/SSE-Boerse-Stuttgart]
+
+
+### PATRIZIA IMMOBILIEN STOCK
+#### Historische Werte [1 Jahr]
+Tägliche Abschlusswerte
+```{r}
+startDate = '2017-06-01'
+endDate = '2018-06-01'
+
+patDataCode = 'SSE/PAT'
+
+patLastData = Quandl(patDataCode, type='zoo', collapse="daily", start_date=startDate, end_date=endDate)[,"Last"]
+plot(patLastData)
+```
+
+#### Erwartete Tagesrendite [Prozent]
+```{r}
+patLastReturn = Quandl(patDataCode, type="zoo",collapse="daily",start_date=startDate, end_date=endDate, transform = "rdiff")[,"Last"]
+plot(patLastReturn,ylab="%",xlab="Zeit",main="PATRIZIA IMMOBILIEN STOCK Rendite in [%]")
+```
+
+#### Mittelwert und die Standardabweichung
+```{r}
+patLastSd <- sd(patLastReturn)
+patLastMean <- mean(patLastReturn)
+
+patMatrix = matrix(c(patLastSd,patLastMean),ncol=2,byrow=FALSE)
+colnames(patMatrix) = c("Standardabweichung","Mittelwert")
+print.table(patMatrix)
+```
+
+#### Preisentwicklung mit GBM
+```{r}
+#Simulation
+
+nSim = 1000
+nDays = 180
+
+S = matrix(0,nrow=nDays,ncol=nSim)
+```
+```{r}
+for (i in 1:nSim) {
+  SVec = rep(0, nDays)
+  SVec[1] = S0
+  for(j in 2:nDays) {
+    pastDay = SVec[j-1]
+    DeltaS = patLastMean*pastDay + patLastSd*pastDay*rnorm(1)
+    SVec[j] = pastDay+DeltaS
+  }
+  S[,i] = SVec
+}
+
+
+#Grenzen der Simulation berechnen
+
+S0 = patLastData[length(patLastData)]
+
+mean = patLastMean * nDays
+sigma = patLastSd * sqrt(nDays)
+t = seq(from=0,to=1,length.out=nDays)
+meanBnd = vector(length = nDays) 
+upBnd = vector(length = nDays) 
+lowBnd = vector(length = nDays) 
+#test = vector(length = nDays)
+
+for(i in 0:nDays){
+  meanBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i])
+  upBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i] + (sigma * 2.5 * sqrt(t[i])))
+  lowBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i] + (sigma * -2.5 * sqrt(t[i])))
+}
+
+
+#Presentation of the simulation.Green Line is the Mean of all simulations and the blue lines are the boundaries
+
+matplot(S,type='l',col=1:100,ylab='PATRIZIA IMMOBILIEN Stock $',xlab='Tage',main='GBM Simulation')
+matlines(lowBnd,lwd=3,col="blue")
+matlines(upBnd,lwd=3,col="blue")
+matlines(meanBnd,lwd=4,col="red")
+```
+

@@ -1,0 +1,99 @@
+---
+title: "OptionPrice"
+date: "14 Mai 2018"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library("Quandl")
+Quandl.api_key("wm-6yYk1kqyzVNzPj9Y1")
+```
+
+## Einleitung
+Bei diesem Dokument geht es um die Monte Carlo Simulation von Kryptow?hrungen. Es werden Bitcoin, Litecoin und IOTA betrachtet.
+
+Alle heruntergeladene Daten der Kryptow?hrungen sind von der Plattform Bitfinex zur Verf?gung gestellt worden. Das herunterladen der Daten erfolgt mithilfe der Quandle API. 
+Es werden nur die tagesabschl?sse der Kryptow?hrungen ber?cksichtigt.
+\newpage
+
+### Bitcoin
+#### Die Historischen Werte
+Der Bitcoin Tagesabschluss Kurs w?hrend der Zeit Periode von Jan.2016 bi Jan.2017.
+```{r}
+startDate = "2016-01-01"
+endDate = "2017-01-01"
+
+btcLast <- Quandl::Quandl("BITFINEX/BTCUSD", type="zoo",collapse="daily",start_date=startDate, end_date=endDate)[,"Last"]
+plot(btcLast)
+```
+
+#### Die Prozentuale Tagesrenditen
+Hier ersichtlich ist die Prozentuale Tagesrenditen ?ber die Zeitperiode
+```{r}
+btcRetLast <- Quandl::Quandl("BITFINEX/BTCUSD", type="zoo",collapse="daily",start_date=startDate, end_date=endDate,transform = "rdiff")[,"Last"]
+plot(btcRetLast,ylab="%",xlab="Time",main="Bitcoin/USD Return in [%]")
+btcLastSD <- sd(btcRetLast)
+btcLastMean <- mean(btcRetLast)
+```
+#### Mittelwert und die Standard abweichung
+```{r}
+t <- matrix(c(btcLastSD,btcLastMean),ncol=2,byrow=TRUE)
+colnames(t) <-c("Standard deviation","mean")
+print.table(t)
+```
+
+#### Simulation
+Die Kalkulation der Werte. 
+```{r}
+#Die Simulation mit Randomwalks
+nSim = 1000
+nDays = 180
+S0 = btcLast[length(btcLast)]
+S = matrix(0,nrow=nDays,ncol=nSim)
+for(ix in 1:nSim){
+  SVec = rep(0,nDays)
+  SVec[1] = S0
+  for(jx in 2:nDays){
+    DeltaS = btcLastMean*SVec[jx-1] + btcLastSD*SVec[jx-1]*rnorm(1)
+    SVec[jx] = SVec[jx-1]+DeltaS
+  }
+  S[,ix] = SVec
+}
+
+#Die Berechnung der Simulations grenzen
+mean = btcLastMean * nDays
+sigma = btcLastSD * sqrt(nDays)
+t = seq(from=0,to=1,length.out=nDays)
+meanBnd = vector(length = nDays); upBnd = vector(length = nDays); loBnd = vector(length = nDays); test = vector(length = nDays)
+for(i in 0:nDays){
+  meanBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i])
+  upBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i] + (sigma * 2.5 * sqrt(t[i])))
+  loBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i] + (sigma * -2.5 * sqrt(t[i])))
+}
+```
+
+Folgend sind die Parameter f?r die Kalulation
+```{r,echo=FALSE}
+print("Data used for the simulation:")
+print(paste0("  startvalue: ",S0))
+print(paste0("  mean: ",btcLastMean))
+print(paste0("  sd: ",btcLastSD))
+```
+
+Das Simulation grafisch dargestellt. Die Blauen Linien kennzeichnen die grenzen der Simulationen
+```{r,echo=FALSE}
+#Darstellung der Graphen
+matplot(S,type='l',col=1:100,ylab='BTC/USD',xlab='Days',main='Simulation')
+matlines(loBnd,lwd=3,col="blue")
+matlines(upBnd,lwd=3,col="blue")
+matlines(meanBnd,lwd=3,col="blue")
+```
+
+Folgend werden die Dichte der Schlusspreise dargestellt
+```{r}
+empDens = density(S[nDays,])
+plot(empDens,col='blue',xlab="Prices",ylab="Density",main="Density of the possible prices after nDays")
+```

@@ -1,0 +1,26 @@
+---
+title: "Untitled"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Api key: 1ywuwWFWbtaziA2GcaRU
+
+Dataset: https://www.quandl.com/data/GPP-Global-Petroleum-Prices
+
+
+---
+
+
+## Einleitung
+Bei diesem Dokument geht es um die Monte Carlo Simulation von Benzinpreisen.
+\newpage
+
+
+
