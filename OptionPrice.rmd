@@ -1,61 +1,80 @@
 ---
-title: "OptionPrice"
+title: "Projekt Option Price"
 author: "Jasmin Thevathas"
 date: "09.06.2018"
 output: 
-  pdf_document: default
   html_document:
     df_print: paged
+  pdf_document: default
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-library("fOptions")
-library("Quandl")
-Quandl.api_key('SKszNw27kx6PnaRnz_hL')
+###Einleitung
+In diesem Dokument geht es um die Monte Carlo Simulation von Aktienpreisen. Für die Simulation werden folgende Aktienkurse verwendet: Holidayceck Group, Verianos Real Estate AG, Valero Energy
 
+Diese Daten werden von der Plattform Boerse Stuttgart zur Verfügung gestellt.
+[https://www.quandl.com/data/SSE-Boerse-Stuttgart]
+\newpage
+
+###Verwendete Libraries
+```{r setup, error=FALSE, warning=FALSE, message=FALSE}
+library("Quandl")
+library("fOptions")
+```
+```{r, include=FALSE}
+Quandl.api_key('SKszNw27kx6PnaRnz_hL')
+```
+Quandle: Die historischen Basiswerte werden über die Quandle API heruntergeladen
+fOptions: fOptions beinhaltet Funktionen für die Berechnung der Optionspreise.
+
+
+###Globale Variablen
+```{r}
+#Timespan for data collection
 startDate = '2017-06-01'
 endDate = '2018-06-01'
+
+#Simulation
+#Count of possible price development
+nSim = 1000
+#Timespan for price development forecasting
+nDays = 180
 ```
 
-Data from Boerse Stuttgart [https://www.quandl.com/data/SSE-Boerse-Stuttgart]
+### HOLIDAYCHECK GROUP STOCK
+https://www.quandl.com/data/SSE/HOC-HOLIDAYCHECK-GROUP-STOCK-WKN-549532-ISIN-DE0005495329-HOC-Stuttgart
 
-
-### PATRIZIA IMMOBILIEN STOCK
-#### Historische Werte [1 Jahr]
-Tägliche Abschlusswerte
+#### Historische Werte
+Tagesabschlüsse von einem Jahr (01.06.2017 - 01.06.2018) werden heruntergeladen und grafisch dargestellt.
 ```{r}
-patDataCode = 'SSE/PAT'
+hocDataCode = 'SSE/HOC'
+hocLast = Quandl(hocDataCode, type='zoo', collapse="daily", start_date=startDate, end_date=endDate)[,"Last"]
 
-patLastData = Quandl(patDataCode, type='zoo', collapse="daily", start_date=startDate, end_date=endDate)[,"Last"]
-plot(patLastData)
+plot(hocLast, ylab="Preis in $",xlab="Zeit",main="Holidaycheck Group Stock Closing Stock")
 ```
 
 #### Erwartete Tagesrendite [Prozent]
+Die prozentuale Tagesrendite ist in der folgenden Graphik zu sehen.
 ```{r}
-patLastReturn = Quandl(patDataCode, type="zoo",collapse="daily",start_date=startDate, end_date=endDate, transform = "rdiff")[,"Last"]
-plot(patLastReturn,ylab="%",xlab="Zeit",main="PATRIZIA IMMOBILIEN STOCK Rendite in [%]")
+hocReturn = Quandl(hocDataCode, type="zoo",collapse="daily",start_date=startDate, end_date=endDate, transform = "rdiff")[,"Last"]
+
+plot(hocReturn, ylab="%",xlab="Zeit",main="Holidaycheck Group Stock Rendite in [%]")
 ```
 
 #### Mittelwert und die Standardabweichung
 ```{r}
-patLastSd <- sd(patLastReturn)
-patLastMean <- mean(patLastReturn)
-```
+hocSd <- sd(hocReturn)
+hocMean <- mean(hocReturn)
 
-```{r}
-patMatrix = matrix(c(patLastSd,patLastMean),ncol=2,byrow=FALSE)
-colnames(patMatrix) = c("Standardabweichung","Mittelwert")
-print.table(patMatrix)
+hocMatrix = matrix(c(hocSd,hocMean),ncol=2,byrow=TRUE)
+colnames(hocMatrix) = c("Standardabweichung","Mittelwert")
+print.table(hocMatrix)
 ```
 
 #### Preisentwicklung mit GBM
+Die folgende Graphik zeigt die Simulation mit Geometrischer Brownscher Bewegung. Dargestellt sind 1000 mögliche Preisentwicklungen in dem nächsten halben Jahr.
 ```{r}
 #Simulation
-
-nSim = 1000
-nDays = 180
-
+S0 = hocLast[length(hocLast)]
 S = matrix(0,nrow=nDays,ncol=nSim)
 
 for (i in 1:nSim) {
@@ -63,58 +82,280 @@ for (i in 1:nSim) {
   SVec[1] = S0
   for(j in 2:nDays) {
     pastDay = SVec[j-1]
-    DeltaS = patLastMean*pastDay + patLastSd*pastDay*rnorm(1)
+    DeltaS = hocMean*pastDay + hocSd*pastDay*rnorm(1)
     SVec[j] = pastDay+DeltaS
   }
   S[,i] = SVec
 }
 
-
-#Grenzen der Simulation berechnen
-
-S0 = patLastData[length(patLastData)]
-
-mean = patLastMean * nDays
-patSigma = patLastSd * sqrt(nDays)
+#Borderlines for the simulation
+mean = hocMean * nDays
+hocSigma = hocSd * sqrt(nDays)
 t = seq(from=0,to=1,length.out=nDays)
 meanBnd = vector(length = nDays) 
 upBnd = vector(length = nDays) 
-lowBnd = vector(length = nDays) 
-#test = vector(length = nDays)
+lowBnd = vector(length = nDays)
 
 for(i in 0:nDays){
-  meanBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i])
-  upBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i] + (sigma * 2.5 * sqrt(t[i])))
-  lowBnd[i] = S0*exp((( mean-sigma^2/2 ))*t[i] + (sigma * -2.5 * sqrt(t[i])))
+  meanBnd[i] = S0*exp((( mean-hocSigma^2/2 ))*t[i])
+  upBnd[i] = S0*exp((( mean-hocSigma^2/2 ))*t[i] + (hocSigma * 2.5 * sqrt(t[i])))
+  lowBnd[i] = S0*exp((( mean-hocSigma^2/2 ))*t[i] + (hocSigma * -2.5 * sqrt(t[i])))
 }
-```
 
-```{r,echo=FALSE}
-#Presentation of the simulation.Green Line is the Mean of all simulations and the blue lines are the boundaries
-
-matplot(S,type='l',col=1:100,ylab='PATRIZIA IMMOBILIEN Stock $',xlab='Tage',main='GBM Simulation')
+#Presentation of the simulation
+#Red line: Mean of all simulations
+#Blue lines: BOundaris in this simulation
+matplot(S,type='l',col=1:100,ylab='Holidaycheck Group Stock in $',xlab='Zeit',main='GBM Simulation')
 matlines(lowBnd,lwd=3,col="blue")
 matlines(upBnd,lwd=3,col="blue")
 matlines(meanBnd,lwd=4,col="red")
 ```
 
+Die Dichte der Schlusspreise ist in der folgenden Graphik dargestellt.
+```{r}
+#theoretical density
+lnMean = coredata(S0)*exp(hocMean*nDays)
+lnSD = coredata(S0)*exp(hocMean*nDays)*sqrt(exp((hocSd^2)*nDays)-1)
+
+meanOfLog = log(S0) + (hocMean-(hocSd^2)/2)*nDays
+sdOfLog = hocSd*sqrt(nDays)
+priceGrid = seq(0,lnMean+6*lnSD,length=10000)
+theoDens = dlnorm(priceGrid,meanOfLog,sdOfLog)
+#empirical density
+empDens = density(S[nDays,])
+
+#Black line: longnormal distribution of theoretical density
+#Blue line: longnormal distribution of empirical density
+plot(priceGrid,theoDens,type='l',xlab='Preis',ylab='Dichte',main="Dichte der möglichen Preise nach Zeit(nDays)")
+lines(empDens,col='blue')
+```
+
+#### Call Put Option price Black Scholes
+Resultierende Optionspreise mit dem Modell
+```{r}
+S = head(Quandl(hocDataCode, start_date=startDate, end_date=endDate), n=1)$"Previous Day Price"
+strikecall = 15
+optionCall = GBSOption(TypeFlag = "c", S, strikecall, 1/12, r = 0.03, b = 0.03, hocSigma)
+cat("Option Call Price",optionCall@price)
+
+strikeput = 12
+optionPut = GBSOption(TypeFlag = "p", S, strikeput, 1/12, r = 0.03, b = 0.03, hocSigma)
+cat("Option Put Price",optionPut@price)
+
+```
 
 
-#### Call Put Options price Black Scholes
+### VERIANOS REAL ESTATE AG STOCK
+https://www.quandl.com/data/SSE/VROS-VERIANOS-REAL-ESTATE-AG-STOCK-WKN-A0Z2Y4-ISIN-DE000A0Z2Y48-VROS-Stuttgart
+
+#### Historische Werte
+Tagesabschlüsse von einem Jahr (01.06.2017 - 01.06.2018) werden heruntergeladen und grafisch dargestellt.
+```{r}
+vrosDataCode = 'SSE/VROS'
+vrosLast = Quandl(vrosDataCode, type='zoo', collapse="daily", start_date=startDate, end_date=endDate)[,"Last"]
+
+plot(vrosLast, ylab="Preis in $",xlab="Zeit",main="Verianos Real Estate AG Stock")
+```
+
+#### Erwartete Tagesrendite [Prozent]
+Die prozentuale Tagesrendite ist in der folgenden Graphik zu sehen.
+```{r}
+vrosReturn = Quandl(vrosDataCode, type="zoo",collapse="daily",start_date=startDate, end_date=endDate, transform = "rdiff")[,"Last"]
+
+plot(vrosReturn, ylab="%",xlab="Zeit",main="Verianos Real Estate AG Stock Rendite in [%]")
+```
+
+#### Mittelwert und die Standardabweichung
+```{r}
+vrosSd <- sd(vrosReturn)
+vrosMean <- mean(vrosReturn)
+
+vrosMatrix = matrix(c(vrosSd,vrosMean),ncol=2,byrow=TRUE)
+colnames(vrosMatrix) = c("Standardabweichung","Mittelwert")
+print.table(vrosMatrix)
+```
+
+#### Preisentwicklung mit GBM
+Die folgende Graphik zeigt die Simulation mit Geometrischer Brownscher Bewegung. Dargestellt sind 1000 mögliche Preisentwicklungen in dem nächsten halben Jahr.
+```{r}
+#Simulation
+S0 = vrosLast[length(vrosLast)]
+S = matrix(0,nrow=nDays,ncol=nSim)
+
+for (i in 1:nSim) {
+  SVec = rep(0, nDays)
+  SVec[1] = S0
+  for(j in 2:nDays) {
+    pastDay = SVec[j-1]
+    DeltaS = vrosMean*pastDay + vrosSd*pastDay*rnorm(1)
+    SVec[j] = pastDay+DeltaS
+  }
+  S[,i] = SVec
+}
+
+#Borderlines for the simulation
+mean = vrosMean * nDays
+vrosSigma = vrosSd * sqrt(nDays)
+t = seq(from=0,to=1,length.out=nDays)
+meanBnd = vector(length = nDays) 
+upBnd = vector(length = nDays) 
+lowBnd = vector(length = nDays)
+
+for(i in 0:nDays){
+  meanBnd[i] = S0*exp((( mean-vrosSigma^2/2 ))*t[i])
+  upBnd[i] = S0*exp((( mean-vrosSigma^2/2 ))*t[i] + (vrosSigma * 2.5 * sqrt(t[i])))
+  lowBnd[i] = S0*exp((( mean-vrosSigma^2/2 ))*t[i] + (vrosSigma * -2.5 * sqrt(t[i])))
+}
+
+#Presentation of the simulation
+#Red line: Mean of all simulations
+#Blue lines: BOundaris in this simulation
+matplot(S,type='l',col=1:100,ylab='Verianos Real Estate AG Stock in $',xlab='Zeit',main='GBM Simulation')
+matlines(lowBnd,lwd=3,col="blue")
+matlines(upBnd,lwd=3,col="blue")
+matlines(meanBnd,lwd=4,col="red")
+```
+
+Die Dichte der Schlusspreise ist in der folgenden Graphik dargestellt.
+```{r}
+#theoretical density
+lnMean = coredata(S0)*exp(vrosMean*nDays)
+lnSD = coredata(S0)*exp(vrosMean*nDays)*sqrt(exp((vrosSd^2)*nDays)-1)
+
+meanOfLog = log(S0) + (vrosMean-(vrosSd^2)/2)*nDays
+sdOfLog = vrosSd*sqrt(nDays)
+priceGrid = seq(0,lnMean+6*lnSD,length=10000)
+theoDens = dlnorm(priceGrid,meanOfLog,sdOfLog)
+#empirical density
+empDens = density(S[nDays,])
+
+#Black line: longnormal distribution of theoretical density
+#Blue line: longnormal distribution of empirical density
+plot(priceGrid,theoDens,type='l',xlab='Preis',ylab='Dichte',main="Dichte der möglichen Preise nach Zeit(nDays)")
+lines(empDens,col='blue')
+```
+
+#### Call Put Option price Black Scholes
 --> Berechnung der Optionspreise mit dem Modell und Vergleich mit dem theoretischen Black Scholes Modell
 http://stock.tradingninja.com/how-to-price-stock-options-using-r/
 
 ```{r}
-openS = head(Quandl(patDataCode, start_date=startDate, end_date=endDate), n=1)
-S = openS$Open
+S = head(Quandl(vrosDataCode, start_date=startDate, end_date=endDate), n=1)$"Previous Day Price"
 strikecall = 15
-optionCall = GBSOption(TypeFlag = "c", S, strikecall, 1/12, r = 0.03, b = 0.03, patSigma)
+optionCall = GBSOption(TypeFlag = "c", S, strikecall, 1/12, r = 0.03, b = 0.03, vrosSigma)
 cat("Option Call Price",optionCall@price)
 
 strikeput = 12
-optionPut = GBSOption(TypeFlag = "p", S, strikeput, 1/12, r = 0.03, b = 0.03, patSigma)
+optionPut = GBSOption(TypeFlag = "p", S, strikeput, 1/12, r = 0.03, b = 0.03, vrosSigma)
 cat("Option Put Price",optionPut@price)
 
+```
 
+
+### VALERO ENERGY STOCK
+https://www.quandl.com/data/SSE/V1L-VALERO-ENERGY-STOCK-WKN-908683-ISIN-US91913Y1001-V1L-Stuttgart
+
+#### Historische Werte
+Tagesabschlüsse von einem Jahr (01.06.2017 - 01.06.2018) werden heruntergeladen und grafisch dargestellt.
+```{r}
+vlDataCode = 'SSE/V1L'
+vlLast = Quandl(vlDataCode, type='zoo', collapse="daily", start_date=startDate, end_date=endDate)[,"Last"]
+
+plot(vlLast, ylab="Preis in $",xlab="Zeit",main="Valero Energy Stock")
+```
+
+#### Erwartete Tagesrendite [Prozent]
+Die prozentuale Tagesrendite ist in der folgenden Graphik zu sehen.
+```{r}
+vlReturn = Quandl(vlDataCode, type="zoo",collapse="daily",start_date=startDate, end_date=endDate, transform = "rdiff")[,"Last"]
+
+plot(vlReturn, ylab="%",xlab="Zeit",main="Valero Energy Stock Rendite in [%]")
+```
+
+#### Mittelwert und die Standardabweichung
+```{r}
+vlSd <- sd(vlReturn)
+vlMean <- mean(vlReturn)
+
+vlMatrix = matrix(c(vlSd,vlMean),ncol=2,byrow=TRUE)
+colnames(vlMatrix) = c("Standardabweichung","Mittelwert")
+print.table(vlMatrix)
+```
+
+#### Preisentwicklung mit GBM
+Die folgende Graphik zeigt die Simulation mit Geometrischer Brownscher Bewegung. Dargestellt sind 1000 mögliche Preisentwicklungen in dem nächsten halben Jahr.
+```{r}
+#Simulation
+S0 = vlLast[length(vlLast)]
+S = matrix(0,nrow=nDays,ncol=nSim)
+
+for (i in 1:nSim) {
+  SVec = rep(0, nDays)
+  SVec[1] = S0
+  for(j in 2:nDays) {
+    pastDay = SVec[j-1]
+    DeltaS = vlMean*pastDay + vlSd*pastDay*rnorm(1)
+    SVec[j] = pastDay+DeltaS
+  }
+  S[,i] = SVec
+}
+
+#Borderlines for the simulation
+mean = vlMean * nDays
+vlSigma = vlSd * sqrt(nDays)
+t = seq(from=0,to=1,length.out=nDays)
+meanBnd = vector(length = nDays) 
+upBnd = vector(length = nDays) 
+lowBnd = vector(length = nDays)
+
+for(i in 0:nDays){
+  meanBnd[i] = S0*exp((( mean-vlSigma^2/2 ))*t[i])
+  upBnd[i] = S0*exp((( mean-vlSigma^2/2 ))*t[i] + (vlSigma * 2.5 * sqrt(t[i])))
+  lowBnd[i] = S0*exp((( mean-vlSigma^2/2 ))*t[i] + (vlSigma * -2.5 * sqrt(t[i])))
+}
+
+#Presentation of the simulation
+#Red line: Mean of all simulations
+#Blue lines: BOundaris in this simulation
+matplot(S,type='l',col=1:100,ylab='Valero Energy Stock in $',xlab='Zeit',main='GBM Simulation')
+matlines(lowBnd,lwd=3,col="blue")
+matlines(upBnd,lwd=3,col="blue")
+matlines(meanBnd,lwd=4,col="red")
+```
+
+Die Dichte der Schlusspreise ist in der folgenden Graphik dargestellt.
+```{r}
+#theoretical density
+lnMean = coredata(S0)*exp(vlMean*nDays)
+lnSD = coredata(S0)*exp(vlMean*nDays)*sqrt(exp((vlSd^2)*nDays)-1)
+
+meanOfLog = log(S0) + (vlMean-(vlSd^2)/2)*nDays
+sdOfLog = vlSd*sqrt(nDays)
+priceGrid = seq(0,lnMean+6*lnSD,length=10000)
+theoDens = dlnorm(priceGrid,meanOfLog,sdOfLog)
+#empirical density
+empDens = density(S[nDays,])
+
+#Black line: longnormal distribution of theoretical density
+#Blue line: longnormal distribution of empirical density
+plot(priceGrid,theoDens,type='l',xlab='Preis',ylab='Dichte' ,main="Dichte der möglichen Preise nach Zeit(nDays)")
+lines(empDens,col='blue')
+```
+
+
+#### Call Put Option price Black Scholes
+--> Berechnung der Optionspreise mit dem Modell und Vergleich mit dem theoretischen Black Scholes Modell
+http://stock.tradingninja.com/how-to-price-stock-options-using-r/
+
+```{r}
+S = head(Quandl(vlDataCode, start_date=startDate, end_date=endDate), n=1)$"Previous Day Price"
+strikecall = 15
+optionCall = GBSOption(TypeFlag = "c", S, strikecall, 1/12, r = 0.03, b = 0.03, vlSigma)
+cat("Option Call Price",optionCall@price)
+
+strikeput = 12
+
+optionPut = GBSOption(TypeFlag = "p", S, strikeput, 1/12, r = 0.03, b = 0.03, vlSigma)
+cat("Option Put Price",optionPut@price)
 
 ```
