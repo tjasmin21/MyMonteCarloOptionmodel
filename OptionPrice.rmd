@@ -134,11 +134,11 @@ lines(empDens,col='blue')
 Resultierende Optionspreise mit dem Modell
 ```{r}
 S = head(Quandl(hocDataCode, start_date=startDate, end_date=endDate), n=1)$"Previous Day Price"
-strikecall = 15
+strikecall = 4
 optionCall = GBSOption(TypeFlag = "c", S, strikecall, 1/12, r = 0.03, b = 0.03, hocSigma)
 cat("Option Call Price",optionCall@price)
 
-strikeput = 12
+strikeput = 1
 optionPut = GBSOption(TypeFlag = "p", S, strikeput, 1/12, r = 0.03, b = 0.03, hocSigma)
 cat("Option Put Price",optionPut@price)
 
@@ -236,16 +236,14 @@ lines(empDens,col='blue')
 ```
 
 #### Call Put Option price Black Scholes
---> Berechnung der Optionspreise mit dem Modell und Vergleich mit dem theoretischen Black Scholes Modell
-http://stock.tradingninja.com/how-to-price-stock-options-using-r/
-
+Resultierende Optionspreise mit dem Modell
 ```{r}
 S = head(Quandl(vrosDataCode, start_date=startDate, end_date=endDate), n=1)$"Previous Day Price"
-strikecall = 15
+strikecall = 1.7
 optionCall = GBSOption(TypeFlag = "c", S, strikecall, 1/12, r = 0.03, b = 0.03, vrosSigma)
 cat("Option Call Price",optionCall@price)
 
-strikeput = 12
+strikeput = 1.4
 optionPut = GBSOption(TypeFlag = "p", S, strikeput, 1/12, r = 0.03, b = 0.03, vrosSigma)
 cat("Option Put Price",optionPut@price)
 
@@ -344,16 +342,14 @@ lines(empDens,col='blue')
 
 
 #### Call Put Option price Black Scholes
---> Berechnung der Optionspreise mit dem Modell und Vergleich mit dem theoretischen Black Scholes Modell
-http://stock.tradingninja.com/how-to-price-stock-options-using-r/
-
+Resultierende Optionspreise mit dem Modell
 ```{r}
 S = head(Quandl(vlDataCode, start_date=startDate, end_date=endDate), n=1)$"Previous Day Price"
-strikecall = 15
+strikecall = 100
 optionCall = GBSOption(TypeFlag = "c", S, strikecall, 1/12, r = 0.03, b = 0.03, vlSigma)
 cat("Option Call Price",optionCall@price)
 
-strikeput = 12
+strikeput = 70
 
 optionPut = GBSOption(TypeFlag = "p", S, strikeput, 1/12, r = 0.03, b = 0.03, vlSigma)
 cat("Option Put Price",optionPut@price)
